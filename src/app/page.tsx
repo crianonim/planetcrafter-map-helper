@@ -93,21 +93,11 @@ export default function Home() {
       />
     );
   }
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const x: number = parseInt(f.get("x")?.toString() || "");
-    const y: number = parseInt(f.get("y")?.toString() || "");
-    const type = (f.get("type")?.toString() || "") as MarkerType;
-    const description = f.get("description")?.toString() || "";
-    const newMarker: Marker = { point: [y, x], type, description };
-    console.log({ newMarker });
-    setMarkers((m) => [...m, newMarker]);
-  }
+
   return (
-    <div className="flex">
+    <div className="flex h-screen text-sm">
       <svg
-        className="border border-black h-screen"
+        className="border border-black"
         viewBox={"0 0 " + maxDimensionX + " " + maxDimensionY}
         onClick={(e) => {
           const pt = e.currentTarget.createSVGPoint();
@@ -182,28 +172,6 @@ export default function Home() {
         <div className="border border-black">
           {selectedPoint ? pointToString(selectedPoint) : "n/a"}
         </div>
-        {selectedMarker && (
-          <div>
-            <div className="border border-slate-500 w-[200px]">
-              <div className="flex justify-between">
-                <div>
-                  {selectedMarker.type} {pointToString(selectedMarker.point)}
-                </div>
-                <button
-                  className="px-1 border border-current"
-                  onClick={() => {
-                    const ms = removeMarker(markers, selectedMarker);
-                    setMarkers(ms);
-                    setSelectedMarker(null);
-                  }}
-                >
-                  x
-                </button>
-              </div>
-              <div>{selectedMarker.description}</div>
-            </div>
-          </div>
-        )}
 
         <div className="flex flex-col">
           <select
@@ -235,6 +203,41 @@ export default function Home() {
           >
             add
           </button>
+        </div>
+        <div className="h-[50px] border border-slate-500 px-1">
+          {selectedMarker && (
+            <div>
+              <div className="flex justify-between">
+                <div>
+                  {selectedMarker.type} {pointToString(selectedMarker.point)}
+                </div>
+                <button
+                  className="px-1 border border-current"
+                  onClick={() => {
+                    const ms = removeMarker(markers, selectedMarker);
+                    setMarkers(ms);
+                    setSelectedMarker(null);
+                  }}
+                >
+                  x
+                </button>
+              </div>
+              <div>{selectedMarker.description || "n/a"}</div>
+            </div>
+          )}
+        </div>
+        <div className="overflow-y-auto">
+          {markers.map((m) => (
+            <div
+              key={pointToString(m.point)}
+              className="flex cursor-pointer"
+              onClick={() => setSelectedMarker(m)}
+            >
+              <div className="w-[70px]">{pointToString(m.point)}</div>
+              <div className="w-[70px]">[{m.type}]</div>
+              <div>{m.description}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
