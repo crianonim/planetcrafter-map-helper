@@ -10,13 +10,6 @@ type Marker = {
   description: string;
 };
 
-// const startingMarkers: Array<Marker> = [
-//   { point: [12, 123], type: "room", description: "" },
-//   { point: [-123, 233], type: "room", description: "" },
-//   { point: [450, -678], type: "ore", description: "" },
-//   { point: [-227, -3], type: "custom", description: "" },
-// ];
-
 function pointToString(point: Point): string {
   return point[0] + ":" + point[1];
 }
@@ -26,6 +19,16 @@ function removeMarker(markers: Array<Marker>, toRemove: Marker): Array<Marker> {
     (m) => pointToString(m.point) !== pointToString(toRemove.point)
   );
 }
+function stringToMarkerType(s: string): MarkerType {
+  switch (s) {
+    case "custom":
+      return "custom";
+    case "ore":
+      return "ore";
+    default:
+      return "room";
+  }
+}
 
 const startingMarkers: Array<Marker> = JSON.parse(
   window.localStorage.getItem("markers") || "[]"
@@ -33,6 +36,9 @@ const startingMarkers: Array<Marker> = JSON.parse(
 export default function Home() {
   const [selectedMarker, setSelectedMarker] = useState<null | Marker>(null);
   const [selectedPoint, setSelectedPoint] = useState<null | Point>(null);
+  const [hoverPoint, setHoverPoint] = useState<null | Point>(null);
+  const [markerType, setMarkerType] = useState<MarkerType>("room");
+  const [description, setDescription] = useState("");
   const [markers, setMarkers] = useState(startingMarkers);
   useEffect(() => {
     localStorage.setItem("markers", JSON.stringify(markers));
@@ -99,96 +105,136 @@ export default function Home() {
     setMarkers((m) => [...m, newMarker]);
   }
   return (
-    <div className="flex flex-col">
-      <div>Mapa</div>
-      <div className="flex">
-        <svg
-          className="border border-black w-[40%]"
-          viewBox={"0 0 " + maxDimensionX + " " + maxDimensionY}
-          onClick={(e) => {
-            const pt = e.currentTarget.createSVGPoint();
-            pt.x = e.clientX;
-            pt.y = e.clientY;
-            const cursorpt = pt.matrixTransform(
-              e.currentTarget.getScreenCTM()?.inverse()
-            );
-            setSelectedPoint([maxY - cursorpt.y, maxX - cursorpt.x]);
-          }}
-        >
-          <line
-            x1={maxX - 40}
-            x2={maxX + 40}
-            y1={maxY}
-            y2={maxY}
+    <div className="flex">
+      <svg
+        className="border border-black h-screen"
+        viewBox={"0 0 " + maxDimensionX + " " + maxDimensionY}
+        onClick={(e) => {
+          const pt = e.currentTarget.createSVGPoint();
+          pt.x = e.clientX;
+          pt.y = e.clientY;
+          const cursorpt = pt.matrixTransform(
+            e.currentTarget.getScreenCTM()?.inverse()
+          );
+          setSelectedPoint([
+            Math.round(maxY - cursorpt.y),
+            Math.round(maxX - cursorpt.x),
+          ]);
+        }}
+        onMouseMove={(e) => {
+          const pt = e.currentTarget.createSVGPoint();
+          pt.x = e.clientX;
+          pt.y = e.clientY;
+          const cursorpt = pt.matrixTransform(
+            e.currentTarget.getScreenCTM()?.inverse()
+          );
+          setHoverPoint([
+            Math.round(maxY - cursorpt.y),
+            Math.round(maxX - cursorpt.x),
+          ]);
+        }}
+      >
+        <line
+          x1={maxX - 40}
+          x2={maxX + 40}
+          y1={maxY}
+          y2={maxY}
+          stroke="black"
+        />
+        <line
+          y1={maxY - 40}
+          y2={maxY + 40}
+          x1={maxX}
+          x2={maxX}
+          stroke="black"
+        />
+        {markers.map(drawMarker)}
+        {selectedMarker && (
+          <circle
+            r="40"
+            cx={maxX - selectedMarker.point[1]}
+            cy={maxY - selectedMarker.point[0]}
+            fill="none"
             stroke="black"
           />
+        )}
+        {selectedPoint && (
+          <circle
+            r="20"
+            cx={maxX - selectedPoint[1]}
+            cy={maxY - selectedPoint[0]}
+          />
+        )}
+        {selectedMarker && selectedPoint && (
           <line
-            y1={maxY - 40}
-            y2={maxY + 40}
-            x1={maxX}
-            x2={maxX}
+            x1={maxX - selectedMarker.point[1]}
+            y1={maxY - selectedMarker.point[0]}
+            x2={maxX - selectedPoint[1]}
+            y2={maxY - selectedPoint[0]}
             stroke="black"
           />
-          {markers.map(drawMarker)}
-          {selectedMarker && (
-            <circle
-              r="40"
-              cx={maxX - selectedMarker.point[1]}
-              cy={maxY - selectedMarker.point[0]}
-              fill="none"
-              stroke="black"
-            />
-          )}
-          {selectedPoint && (
-            <circle
-              r="20"
-              cx={maxX - selectedPoint[1]}
-              cy={maxY - selectedPoint[0]}
-            />
-          )}
-          {selectedMarker && selectedPoint && (
-            <line
-              x1={maxX - selectedMarker.point[1]}
-              y1={maxY - selectedMarker.point[0]}
-              x2={maxX - selectedPoint[1]}
-              y2={maxY - selectedPoint[0]}
-              stroke="black"
-            />
-          )}
-        </svg>
+        )}
+      </svg>
+      <div className="flex flex-col gap-1">
+        <div className="border border-black">
+          {hoverPoint ? pointToString(hoverPoint) : "n/a"}
+        </div>
+        <div className="border border-black">
+          {selectedPoint ? pointToString(selectedPoint) : "n/a"}
+        </div>
         {selectedMarker && (
           <div>
             <div className="border border-slate-500 w-[200px]">
-              <div>{pointToString(selectedMarker.point)}</div>
-              <div>{selectedMarker.type}</div>
+              <div className="flex justify-between">
+                <div>
+                  {selectedMarker.type} {pointToString(selectedMarker.point)}
+                </div>
+                <button
+                  className="px-1 border border-current"
+                  onClick={() => {
+                    const ms = removeMarker(markers, selectedMarker);
+                    setMarkers(ms);
+                    setSelectedMarker(null);
+                  }}
+                >
+                  x
+                </button>
+              </div>
               <div>{selectedMarker.description}</div>
-              <button
-                onClick={() => {
-                  const ms = removeMarker(markers, selectedMarker);
-                  setMarkers(ms);
-                  setSelectedMarker(null);
-                }}
-              >
-                remove
-              </button>
             </div>
           </div>
         )}
 
-        <div>
-          <form onSubmit={handleSubmit}>
-            <fieldset className="flex flex-col">
-              <input type="number" name="y" id="y" />
-              <input type="number" name="x" id="x" />
-              <input name="description" />
-              <select name="type">
-                <option>room</option>
-                <option>ore</option>
-                <option>custom</option>
-              </select>
-              <button>add</button>
-            </fieldset>
-          </form>
+        <div className="flex flex-col">
+          <select
+            className="p-1 border border-black"
+            name="type"
+            onChange={(e) => {
+              setMarkerType(stringToMarkerType(e.target.value));
+            }}
+          >
+            <option>room</option>
+            <option>ore</option>
+            <option>custom</option>
+          </select>
+          <input
+            className="p-1 border border-black"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <button
+            onClick={() => {
+              if (selectedPoint)
+                setMarkers((m) => [
+                  ...m,
+                  { type: markerType, point: selectedPoint, description },
+                ]);
+            }}
+            className="p-1 border border-black disabled:opacity-50"
+            disabled={!selectedPoint}
+          >
+            add
+          </button>
         </div>
       </div>
     </div>
