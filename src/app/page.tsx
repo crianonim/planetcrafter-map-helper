@@ -1,113 +1,196 @@
-import Image from 'next/image'
+"use client";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
+type Point = [number, number];
+
+type MarkerType = "room" | "custom" | "ore";
+type Marker = {
+  point: Point;
+  type: MarkerType;
+  description: string;
+};
+
+// const startingMarkers: Array<Marker> = [
+//   { point: [12, 123], type: "room", description: "" },
+//   { point: [-123, 233], type: "room", description: "" },
+//   { point: [450, -678], type: "ore", description: "" },
+//   { point: [-227, -3], type: "custom", description: "" },
+// ];
+
+function pointToString(point: Point): string {
+  return point[0] + ":" + point[1];
+}
+
+function removeMarker(markers: Array<Marker>, toRemove: Marker): Array<Marker> {
+  return markers.filter(
+    (m) => pointToString(m.point) !== pointToString(toRemove.point)
+  );
+}
+
+const startingMarkers: Array<Marker> = JSON.parse(
+  window.localStorage.getItem("markers") || "[]"
+);
 export default function Home() {
+  const [selectedMarker, setSelectedMarker] = useState<null | Marker>(null);
+  const [selectedPoint, setSelectedPoint] = useState<null | Point>(null);
+  const [markers, setMarkers] = useState(startingMarkers);
+  useEffect(() => {
+    localStorage.setItem("markers", JSON.stringify(markers));
+    console.log("Saving markers", markers);
+  }, [markers]);
+
+  const [minY, maxY, minX, maxX] = useMemo(() => {
+    const minY =
+      -50 +
+      markers
+        .map((x) => x.point[0])
+        .reduce((prev, curr) => Math.min(prev, curr));
+
+    const maxY =
+      50 +
+      markers
+        .map((x) => x.point[0])
+        .reduce((prev, curr) => Math.max(prev, curr));
+
+    const minX =
+      -50 +
+      markers
+        .map((x) => x.point[1])
+        .reduce((prev, curr) => Math.min(prev, curr));
+
+    const maxX =
+      50 +
+      markers
+        .map((x) => x.point[1])
+        .reduce((prev, curr) => Math.max(prev, curr));
+    console.log(markers, minY, maxY, minX, maxX);
+    return [minY, maxY, minX, maxX];
+  }, [markers]);
+
+  const maxDimensionX = maxX - minX;
+  const maxDimensionY = maxY - minY;
+
+  function drawMarker(m: Marker) {
+    const p = m.point;
+    const color =
+      m.type === "room" ? "blue" : m.type === "ore" ? "red" : "green";
+    return (
+      <circle
+        className="cursor-pointer"
+        r="10"
+        cx={maxX - p[1]}
+        cy={maxY - p[0]}
+        key={pointToString(p)}
+        onMouseEnter={() => setSelectedMarker(m)}
+        stroke={color}
+        fill={color}
+      />
+    );
+  }
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const x: number = parseInt(f.get("x")?.toString() || "");
+    const y: number = parseInt(f.get("y")?.toString() || "");
+    const type = (f.get("type")?.toString() || "") as MarkerType;
+    const description = f.get("description")?.toString() || "";
+    const newMarker: Marker = { point: [y, x], type, description };
+    console.log({ newMarker });
+    setMarkers((m) => [...m, newMarker]);
+  }
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
+    <div className="flex flex-col">
+      <div>Mapa</div>
+      <div className="flex">
+        <svg
+          className="border border-black w-[40%]"
+          viewBox={"0 0 " + maxDimensionX + " " + maxDimensionY}
+          onClick={(e) => {
+            const pt = e.currentTarget.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const cursorpt = pt.matrixTransform(
+              e.currentTarget.getScreenCTM()?.inverse()
+            );
+            setSelectedPoint([maxY - cursorpt.y, maxX - cursorpt.x]);
+          }}
+        >
+          <line
+            x1={maxX - 40}
+            x2={maxX + 40}
+            y1={maxY}
+            y2={maxY}
+            stroke="black"
+          />
+          <line
+            y1={maxY - 40}
+            y2={maxY + 40}
+            x1={maxX}
+            x2={maxX}
+            stroke="black"
+          />
+          {markers.map(drawMarker)}
+          {selectedMarker && (
+            <circle
+              r="40"
+              cx={maxX - selectedMarker.point[1]}
+              cy={maxY - selectedMarker.point[0]}
+              fill="none"
+              stroke="black"
             />
-          </a>
+          )}
+          {selectedPoint && (
+            <circle
+              r="20"
+              cx={maxX - selectedPoint[1]}
+              cy={maxY - selectedPoint[0]}
+            />
+          )}
+          {selectedMarker && selectedPoint && (
+            <line
+              x1={maxX - selectedMarker.point[1]}
+              y1={maxY - selectedMarker.point[0]}
+              x2={maxX - selectedPoint[1]}
+              y2={maxY - selectedPoint[0]}
+              stroke="black"
+            />
+          )}
+        </svg>
+        {selectedMarker && (
+          <div>
+            <div className="border border-slate-500 w-[200px]">
+              <div>{pointToString(selectedMarker.point)}</div>
+              <div>{selectedMarker.type}</div>
+              <div>{selectedMarker.description}</div>
+              <button
+                onClick={() => {
+                  const ms = removeMarker(markers, selectedMarker);
+                  setMarkers(ms);
+                  setSelectedMarker(null);
+                }}
+              >
+                remove
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <form onSubmit={handleSubmit}>
+            <fieldset className="flex flex-col">
+              <input type="number" name="y" id="y" />
+              <input type="number" name="x" id="x" />
+              <input name="description" />
+              <select name="type">
+                <option>room</option>
+                <option>ore</option>
+                <option>custom</option>
+              </select>
+              <button>add</button>
+            </fieldset>
+          </form>
         </div>
       </div>
-
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+    </div>
+  );
 }
